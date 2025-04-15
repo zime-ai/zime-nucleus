@@ -15,12 +15,13 @@ function App() {
       {/* Sidebar */}
       <div className="w-64 bg-white shadow-lg flex flex-col">
         {/* Logo */}
-        <div className="p-6 border-b flex justify-center">
+        <div className="p-6 border-b flex flex-col items-center">
           <img 
             src={logo}
             alt="Zime" 
-            className="h-8 w-auto"
+            className="h-6 w-auto"
           />
+          <span className="mt-2 italic text-[#6f3096] text-2xl font-bold">Nucleus</span>
         </div>
 
         {/* Navigation */}
