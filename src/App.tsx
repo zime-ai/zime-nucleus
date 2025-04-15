@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { MeetingUploader } from './components/MeetingUploader';
 import { TranscriptUpdater } from './components/TranscriptUpdater';
 import { SpeakerNameUpdater } from './components/SpeakerNameUpdater';
