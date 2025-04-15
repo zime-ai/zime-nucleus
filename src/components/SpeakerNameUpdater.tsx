@@ -66,10 +66,10 @@ export function SpeakerNameUpdater() {
 
       const data = await response.json();
 
-      if (data.error_messages) {
+      if (data.data?.error_message) {
         setStatus({
           type: 'error',
-          text: data.error_messages
+          text: `${data.data.error_message}. Please check the current speaker name.`
         });
         return;
       }
@@ -77,18 +77,20 @@ export function SpeakerNameUpdater() {
       if (response.ok && data.statusCode === 201) {
         setStatus({
           type: 'success',
-          text: 'Speaker names updated successfully!'
+          text: data.data.message || 'Updated successfully.'
         });
       } else {
         setStatus({
           type: 'error',
-          text: 'Failed to update speaker names'
+          text: 'Failed to update speaker names. Please check the current speaker name.'
         });
       }
     } catch (error) {
       setStatus({
         type: 'error',
-        text: error instanceof Error ? error.message : 'Failed to update speaker names'
+        text: error instanceof Error 
+          ? `${error.message}. Please check the current speaker name.`
+          : 'Failed to update speaker names. Please check the current speaker name.'
       });
     } finally {
       setIsUpdating(false);
