@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { MeetingUploader } from './components/MeetingUploader';
 import { TranscriptUpdater } from './components/TranscriptUpdater';
 import { SpeakerNameUpdater } from './components/SpeakerNameUpdater';
+import { Upload, FileText, Users } from 'lucide-react';
+import logo from './assets/zime-logo.png';
 
 type Section = 'meeting' | 'transcript' | 'speaker';
 
@@ -9,56 +11,64 @@ function App() {
   const [currentSection, setCurrentSection] = useState<Section>('meeting');
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-6xl mx-auto px-8 py-4">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-              <img 
-                src="https://app.zime.ai/assets/zime-logo-with-text.png"
-                alt="Zime" 
-                className="h-8"
-              />
-            </div>
-            <nav className="flex gap-4">
-              <button
-                onClick={() => setCurrentSection('meeting')}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  currentSection === 'meeting'
-                    ? 'bg-orange-500 text-white'
-                    : 'text-gray-600 hover:bg-orange-50'
-                }`}
-              >
-                Meeting Uploader
-              </button>
-              <button
-                onClick={() => setCurrentSection('transcript')}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  currentSection === 'transcript'
-                    ? 'bg-orange-500 text-white'
-                    : 'text-gray-600 hover:bg-orange-50'
-                }`}
-              >
-                Transcript Updater
-              </button>
-              <button
-                onClick={() => setCurrentSection('speaker')}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  currentSection === 'speaker'
-                    ? 'bg-orange-500 text-white'
-                    : 'text-gray-600 hover:bg-orange-50'
-                }`}
-              >
-                Speaker Name Updater
-              </button>
-            </nav>
-          </div>
+    <div className="flex h-screen bg-gray-100">
+      {/* Sidebar */}
+      <div className="w-64 bg-white shadow-lg flex flex-col">
+        {/* Logo */}
+        <div className="p-6 border-b flex justify-center">
+          <img 
+            src={logo}
+            alt="Zime" 
+            className="h-8 w-auto"
+          />
         </div>
-      </header>
-      
-      {currentSection === 'meeting' && <MeetingUploader />}
-      {currentSection === 'transcript' && <TranscriptUpdater />}
-      {currentSection === 'speaker' && <SpeakerNameUpdater />}
+
+        {/* Navigation */}
+        <nav className="flex-1 pt-6">
+          <button
+            onClick={() => setCurrentSection('meeting')}
+            className={`w-full flex items-center gap-3 px-6 py-3 text-left transition-colors ${
+              currentSection === 'meeting'
+                ? 'bg-orange-50 text-orange-600 border-r-4 border-orange-500'
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Upload size={20} />
+            <span>Meeting Uploader</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentSection('transcript')}
+            className={`w-full flex items-center gap-3 px-6 py-3 text-left transition-colors ${
+              currentSection === 'transcript'
+                ? 'bg-orange-50 text-orange-600 border-r-4 border-orange-500'
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <FileText size={20} />
+            <span>Transcript Updater</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentSection('speaker')}
+            className={`w-full flex items-center gap-3 px-6 py-3 text-left transition-colors ${
+              currentSection === 'speaker'
+                ? 'bg-orange-50 text-orange-600 border-r-4 border-orange-500'
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Users size={20} />
+            <span>Speaker Name Updater</span>
+          </button>
+        </nav>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto">
+        {currentSection === 'meeting' && <MeetingUploader />}
+        {currentSection === 'transcript' && <TranscriptUpdater />}
+        {currentSection === 'speaker' && <SpeakerNameUpdater />}
+      </div>
     </div>
   );
 }

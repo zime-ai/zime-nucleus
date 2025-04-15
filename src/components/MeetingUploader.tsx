@@ -68,7 +68,20 @@ export function MeetingUploader() {
   };
 
   const handleFileChange = (id: number, file: File | null) => {
+    if (file && !file.name.toLowerCase().endsWith('.mp4')) {
+      setUploadStatuses(prev => [
+        ...prev.filter(status => status.meetingId !== id),
+        {
+          meetingId: id,
+          status: 'error',
+          error: 'Only MP4 files are allowed'
+        }
+      ]);
+      return;
+    }
     handleInputChange(id, 'recording', file);
+    // Clear any previous error when a valid file is selected
+    setUploadStatuses(prev => prev.filter(status => status.meetingId !== id));
   };
 
   const validateMeeting = (meeting: Meeting): string | null => {
@@ -145,20 +158,30 @@ export function MeetingUploader() {
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             const response = JSON.parse(xhr.responseText);
-            setUploadStatuses(prev => prev.map(status => 
-              status.meetingId === meeting.id 
-                ? { ...status, status: 'success', callId: response.data.callId } 
-                : status
-            ));
-            resolve(response);
+            if (response.error_messages) {
+              setUploadStatuses(prev => prev.map(status => 
+                status.meetingId === meeting.id 
+                  ? { ...status, status: 'error', error: response.error_messages } 
+                  : status
+              ));
+              reject(new Error(response.error_messages));
+            } else {
+              setUploadStatuses(prev => prev.map(status => 
+                status.meetingId === meeting.id 
+                  ? { ...status, status: 'success', callId: response.data?.callId } 
+                  : status
+              ));
+              resolve(response);
+            }
           } else {
             const error = JSON.parse(xhr.responseText);
+            const errorMessage = error.error_messages || 'Upload failed';
             setUploadStatuses(prev => prev.map(status => 
               status.meetingId === meeting.id 
-                ? { ...status, status: 'error', error: error.message || 'Upload failed' } 
+                ? { ...status, status: 'error', error: errorMessage } 
                 : status
             ));
-            reject(new Error(error.message || 'Upload failed'));
+            reject(new Error(errorMessage));
           }
         });
 
@@ -171,7 +194,7 @@ export function MeetingUploader() {
           reject(new Error('Network error occurred'));
         });
 
-        xhr.open('POST', 'https://api-v1-prod-ift.innerfit.me/core/uploadVideosAndProcess');
+        xhr.open('POST', 'https://nodejs-prod.zime.ai/uploadVideosAndProcess');
         xhr.send(formData);
       });
     } catch (error) {
@@ -266,9 +289,9 @@ export function MeetingUploader() {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
+              <div className="space-y-2">
                 <label className="flex items-center gap-2 text-gray-700 mb-2">
-                  <FileUp size={18} />
+                  <Calendar size={18} />
                   Meeting Title *
                 </label>
                 <input
@@ -277,16 +300,16 @@ export function MeetingUploader() {
                   onChange={(e) =>
                     handleInputChange(meeting.id, 'title', e.target.value)
                   }
-                  placeholder="Enter the meeting title"
-                  required
                   className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                  placeholder="Enter meeting title"
+                  required
                 />
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <label className="flex items-center gap-2 text-gray-700 mb-2">
                   <Mail size={18} />
-                  User Email *
+                  Organiser Email ID *
                 </label>
                 <input
                   type="email"
@@ -294,16 +317,16 @@ export function MeetingUploader() {
                   onChange={(e) =>
                     handleInputChange(meeting.id, 'email', e.target.value)
                   }
-                  placeholder="Enter the organiser email i.e. kartik@zime.ai"
-                  required
                   className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                  placeholder="Enter organiser mail ID i.e. kartik@zime.ai"
+                  required
                 />
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <label className="flex items-center gap-2 text-gray-700 mb-2">
                   <Users size={18} />
-                  Attendees *
+                  Attendees Email ID (separated by comma) *
                 </label>
                 <input
                   type="text"
@@ -311,9 +334,9 @@ export function MeetingUploader() {
                   onChange={(e) =>
                     handleInputChange(meeting.id, 'attendees', e.target.value)
                   }
-                  placeholder="kartik@zime.ai, ashish@zime.ai, sanchit@zime.ai"
-                  required
                   className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                  placeholder="Enter attendees mail ID i.e. kartik@zime.ai, ashish@zime.ai, sanchit@zime.ai"
+                  required
                 />
               </div>
 
@@ -353,10 +376,11 @@ export function MeetingUploader() {
               <div>
                 <label className="flex items-center gap-2 text-gray-700 mb-2">
                   <Upload size={18} />
-                  Recording File *
+                  Recording File (MP4) *
                 </label>
                 <input
                   type="file"
+                  accept=".mp4,video/mp4"
                   onChange={(e) =>
                     handleFileChange(meeting.id, e.target.files?.[0] || null)
                   }
