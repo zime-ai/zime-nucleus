@@ -21,6 +21,14 @@ export function SpeakerNameUpdater() {
 
   useEffect(() => {
     const num = parseInt(numSpeakers) || 0;
+    if (num > 15) {
+      setStatus({
+        type: 'error',
+        text: 'Enter number less than 15'
+      });
+      return;
+    }
+    setStatus(null);
     setSpeakers(prevSpeakers => {
       const newSpeakers = Array(num).fill(null).map((_, index) => ({
         id: index + 1,
@@ -150,10 +158,10 @@ export function SpeakerNameUpdater() {
               <input
                 type="number"
                 min="1"
-                max="10"
+                max="15"
                 value={numSpeakers}
                 onChange={(e) => setNumSpeakers(e.target.value)}
-                placeholder="Enter number of speakers"
+                placeholder="Enter number of speakers (max 15)"
                 required
                 className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
               />

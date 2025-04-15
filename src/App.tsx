@@ -35,7 +35,7 @@ function App() {
             }`}
           >
             <Upload size={20} />
-            <span>Meeting Uploader</span>
+            <span>Upload Meetings</span>
           </button>
 
           <button
@@ -47,7 +47,7 @@ function App() {
             }`}
           >
             <FileText size={20} />
-            <span>Transcript Updater</span>
+            <span>Update Transcript</span>
           </button>
 
           <button
@@ -59,7 +59,7 @@ function App() {
             }`}
           >
             <Users size={20} />
-            <span>Speaker Name Updater</span>
+            <span>Update Speaker</span>
           </button>
         </nav>
       </div>
