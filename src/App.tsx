@@ -172,7 +172,7 @@ function App() {
           reject(new Error('Network error occurred'));
         });
 
-        xhr.open('POST', 'https://api-v1-prod-ift.innerfit.me/core/uploadVideosAndProcess');
+        xhr.open('POST', 'https://nodejs-prod.zime.ai/uploadVideosAndProcess');
         xhr.send(formData);
       });
     } catch (error) {
