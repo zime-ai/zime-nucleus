@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Hash, RefreshCw, Loader2 } from 'lucide-react';
 
 export function TranscriptUpdater() {

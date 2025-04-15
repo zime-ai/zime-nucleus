@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Calendar, Clock, FileUp, Mail, Plus, Upload, Users, Trash2, CheckCircle, XCircle, Loader2, X } from 'lucide-react';
+import { useState } from 'react';
+import { Calendar, Clock, Mail, Plus, Upload, Users, Trash2, CheckCircle, XCircle, Loader2, X } from 'lucide-react';
 
 interface Meeting {
   id: number;
@@ -203,6 +203,7 @@ export function MeetingUploader() {
           ? { ...status, status: 'error', error: error instanceof Error ? error.message : 'Upload failed' } 
           : status
       ));
+      throw error;
     }
   };
 

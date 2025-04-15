@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Hash, Users, User, RefreshCw, Loader2, CheckCircle, XCircle } from 'lucide-react';
 
 interface SpeakerInput {
