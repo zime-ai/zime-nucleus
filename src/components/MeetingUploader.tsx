@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, Clock, Mail, Plus, Upload, Users, Trash2, CheckCircle, XCircle, Loader2, X } from 'lucide-react';
+import { Calendar, Clock, Mail, Plus, Upload, Users, Trash2, CheckCircle, XCircle, Loader2, X, FileText } from 'lucide-react';
 
 interface Meeting {
   id: number;
@@ -7,10 +7,10 @@ interface Meeting {
   email: string;
   attendees: string;
   startTime: string;
-  durationHours: string;
-  durationMinutes: string;
-  durationSeconds: string;
   recording: File | null;
+  dealName?: string;
+  dealStageDuringCall?: string;
+  currentDealStage?: string;
 }
 
 interface UploadStatus {
@@ -30,10 +30,10 @@ export function MeetingUploader() {
       email: '',
       attendees: '',
       startTime: '',
-      durationHours: '',
-      durationMinutes: '',
-      durationSeconds: '',
       recording: null,
+      dealName: '',
+      dealStageDuringCall: '',
+      currentDealStage: '',
     },
   ]);
   const [uploadStatuses, setUploadStatuses] = useState<UploadStatus[]>([]);
@@ -48,10 +48,10 @@ export function MeetingUploader() {
         email: '',
         attendees: '',
         startTime: '',
-        durationHours: '',
-        durationMinutes: '',
-        durationSeconds: '',
         recording: null,
+        dealName: '',
+        dealStageDuringCall: '',
+        currentDealStage: '',
       },
     ]);
   };
@@ -90,33 +90,17 @@ export function MeetingUploader() {
     setUploadStatuses(prev => prev.filter(status => status.meetingId !== id));
   };
 
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const validateMeeting = (meeting: Meeting): string | null => {
     if (!meeting.title.trim()) return 'Meeting title is required';
     if (!meeting.email.trim()) return 'Email is required';
+    if (!validateEmail(meeting.email.trim())) return 'Please enter a valid email address';
     if (!meeting.attendees.trim()) return 'Attendees are required';
     if (!meeting.startTime) return 'Start time is required';
-    
-    // Duration validation
-    const hours = parseInt(meeting.durationHours || '0');
-    const minutes = parseInt(meeting.durationMinutes || '0');
-    const seconds = parseInt(meeting.durationSeconds || '0');
-
-    if (isNaN(hours) || isNaN(minutes) || isNaN(seconds)) {
-      return 'Duration must be a valid number';
-    }
-
-    if (hours === 0 && minutes === 0 && seconds === 0) {
-      return 'Duration must be greater than 0';
-    }
-
-    if (minutes >= 60 || seconds >= 60) {
-      return 'Minutes and seconds must be less than 60';
-    }
-
-    if (hours < 0 || minutes < 0 || seconds < 0) {
-      return 'Duration cannot be negative';
-    }
-
     if (!meeting.recording) return 'Recording file is required';
     return null;
   };
@@ -147,20 +131,23 @@ export function MeetingUploader() {
       return;
     }
 
-    const hours = parseInt(meeting.durationHours || '0');
-    const minutes = parseInt(meeting.durationMinutes || '0');
-    const seconds = parseInt(meeting.durationSeconds || '0');
-
-    const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
-
     const formData = new FormData();
     formData.append('title', meeting.title);
     formData.append('email', meeting.email);
     formData.append('attendees', meeting.attendees);
     formData.append('meeting_start_time', meeting.startTime);
-    formData.append('video_duration', totalSeconds.toString());
     if (meeting.recording) {
       formData.append('file', meeting.recording);
+    }
+    // Add deal info if provided
+    if (meeting.dealName?.trim()) {
+      formData.append('deal_name', meeting.dealName);
+    }
+    if (meeting.dealStageDuringCall?.trim()) {
+      formData.append('deal_stage_during_call', meeting.dealStageDuringCall);
+    }
+    if (meeting.currentDealStage?.trim()) {
+      formData.append('current_deal_stage', meeting.currentDealStage);
     }
 
     // Set initial upload status
@@ -191,13 +178,14 @@ export function MeetingUploader() {
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             const response = JSON.parse(xhr.responseText);
-            if (response.error_messages) {
+            if (response.error) {
+              const errorMessage = `${response.error.message}\n${response.error.details}`;
               setUploadStatuses(prev => prev.map(status => 
                 status.meetingId === meeting.id 
-                  ? { ...status, status: 'error', error: response.error_messages } 
+                  ? { ...status, status: 'error', error: errorMessage } 
                   : status
               ));
-              reject(new Error(response.error_messages));
+              reject(new Error(errorMessage));
             } else {
               setUploadStatuses(prev => prev.map(status => 
                 status.meetingId === meeting.id 
@@ -208,7 +196,10 @@ export function MeetingUploader() {
             }
           } else {
             const error = JSON.parse(xhr.responseText);
-            const errorMessage = error.error_messages || 'Upload failed';
+            let errorMessage = 'Upload failed';
+            if (error.error && error.error.message && error.error.details) {
+              errorMessage = `${error.error.message}\n${error.error.details}`;
+            }
             setUploadStatuses(prev => prev.map(status => 
               status.meetingId === meeting.id 
                 ? { ...status, status: 'error', error: errorMessage } 
@@ -252,234 +243,237 @@ export function MeetingUploader() {
   };
 
   const isFormValid = (meeting: Meeting): boolean => {
-    const hours = parseInt(meeting.durationHours || '0');
-    const minutes = parseInt(meeting.durationMinutes || '0');
-    const seconds = parseInt(meeting.durationSeconds || '0');
-
     return Boolean(
       meeting.title.trim() &&
       meeting.email.trim() &&
+      validateEmail(meeting.email.trim()) &&
       meeting.attendees.trim() &&
       meeting.startTime &&
-      !isNaN(hours) &&
-      !isNaN(minutes) &&
-      !isNaN(seconds) &&
-      (hours > 0 || minutes > 0 || seconds > 0) &&
-      minutes < 60 &&
-      seconds < 60 &&
-      hours >= 0 &&
-      minutes >= 0 &&
-      seconds >= 0 &&
       meeting.recording
     );
   };
 
   return (
     <div className="p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto">
         {meetings.map((meeting) => (
-          <div
-            key={meeting.id}
-            className="bg-white p-8 rounded-lg shadow-sm space-y-6 relative"
-          >
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Meeting #{meeting.id}</h2>
-              {meeting.id !== 1 && (
-                <button
-                  onClick={() => deleteMeeting(meeting.id)}
-                  className="text-gray-400 hover:text-red-500 transition-colors"
-                  aria-label="Delete meeting"
+          <div key={meeting.id} className="space-y-6">
+            {/* Upload Status - Moved to top */}
+            {uploadStatuses
+              .filter((status) => status.meetingId === meeting.id)
+              .map((status, index) => (
+                <div
+                  key={index}
+                  className={`mb-6 ${
+                    status.status === 'pending' ? 'bg-white p-6 rounded-lg shadow-sm' : 
+                    status.status === 'success' ? 'bg-green-50 p-4 rounded-lg' :
+                    'bg-red-50 p-4 rounded-lg'
+                  }`}
                 >
-                  <Trash2 size={20} />
-                </button>
-              )}
-            </div>
-
-            {uploadStatuses.find(status => status.meetingId === meeting.id) && (
-              <div className={`p-4 rounded-lg ${
-                uploadStatuses.find(status => status.meetingId === meeting.id)?.status === 'success'
-                  ? 'bg-green-50 text-green-700'
-                  : uploadStatuses.find(status => status.meetingId === meeting.id)?.status === 'error'
-                  ? 'bg-red-50 text-red-700'
-                  : 'bg-blue-50 text-blue-700'
-              }`}>
-                {uploadStatuses.find(status => status.meetingId === meeting.id)?.status === 'success' ? (
-                  <div className="flex items-center gap-2">
-                    <CheckCircle size={20} className="text-green-500" />
-                    <span>Call uploaded successfully! Meeting Link: <a href={`https://app.zime.ai/meeting/${
-                      uploadStatuses.find(status => status.meetingId === meeting.id)?.callId
-                    }`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">{`https://app.zime.ai/meeting/${
-                      uploadStatuses.find(status => status.meetingId === meeting.id)?.callId
-                    }`}</a></span>
-                  </div>
-                ) : uploadStatuses.find(status => status.meetingId === meeting.id)?.status === 'error' ? (
-                  <div className="flex items-center gap-2">
-                    <XCircle size={20} className="text-red-500" />
-                    <span>{uploadStatuses.find(status => status.meetingId === meeting.id)?.error}</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Loader2 size={20} className="animate-spin" />
-                      <span>Uploading... {uploadStatuses.find(status => status.meetingId === meeting.id)?.progress}%</span>
+                  {status.status === 'pending' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-gray-700">
+                        <div className="flex items-center gap-2">
+                          <Loader2 size={20} className="animate-spin text-orange-500" />
+                          <span>Uploading meeting recording...</span>
+                        </div>
+                        <button
+                          onClick={() => cancelUpload(meeting.id)}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-orange-500 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${status.progress}%` }}
+                        ></div>
+                      </div>
+                      <div className="text-sm text-gray-600 text-right">{status.progress}%</div>
                     </div>
-                    <button
-                      onClick={() => cancelUpload(meeting.id)}
-                      className="text-gray-500 hover:text-red-500 transition-colors"
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                  {status.status === 'success' && (
+                    <div className="flex items-center gap-2 text-green-700">
+                      <CheckCircle size={20} className="text-green-500" />
+                      <a 
+                        href={`https://app.zime.ai/meeting/${status.callId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-orange-500 hover:text-orange-600 underline"
+                      >
+                        https://app.zime.ai/meeting/{status.callId}
+                      </a>
+                    </div>
+                  )}
+                  {status.status === 'error' && (
+                    <div className="flex items-start gap-2 text-red-700">
+                      <XCircle size={20} className="text-red-500 mt-1" />
+                      <span className="whitespace-pre-line">{status.error}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-gray-700 mb-2">
-                  <Calendar size={18} />
-                  Meeting Title *
-                </label>
-                <input
-                  type="text"
-                  value={meeting.title}
-                  onChange={(e) =>
-                    handleInputChange(meeting.id, 'title', e.target.value)
-                  }
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
-                  placeholder="Enter meeting title"
-                  required
-                />
-              </div>
+            {/* Meeting Details Card */}
+            <div className="bg-white p-8 rounded-lg shadow-sm">
+              <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+                <Users size={24} />
+                Meeting Details
+              </h2>
 
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-gray-700 mb-2">
-                  <Mail size={18} />
-                  Organiser Email ID *
-                </label>
-                <input
-                  type="email"
-                  value={meeting.email}
-                  onChange={(e) =>
-                    handleInputChange(meeting.id, 'email', e.target.value)
-                  }
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
-                  placeholder="Enter organiser mail ID i.e. kartik@zime.ai"
-                  required
-                />
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="flex items-center gap-2 text-gray-700 mb-2">
+                    <Calendar size={18} />
+                    Meeting Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={meeting.title}
+                    onChange={(e) =>
+                      handleInputChange(meeting.id, 'title', e.target.value)
+                    }
+                    placeholder="Enter meeting title"
+                    required
+                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-gray-700 mb-2">
-                  <Users size={18} />
-                  Attendees Email ID (separated by comma) *
-                </label>
-                <input
-                  type="text"
-                  value={meeting.attendees}
-                  onChange={(e) =>
-                    handleInputChange(meeting.id, 'attendees', e.target.value)
-                  }
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
-                  placeholder="Enter attendees mail ID i.e. kartik@zime.ai, ashish@zime.ai, sanchit@zime.ai"
-                  required
-                />
-              </div>
+                <div>
+                  <label className="flex items-center gap-2 text-gray-700 mb-2">
+                    <Mail size={18} />
+                    Organiser Email ID *
+                  </label>
+                  <input
+                    type="email"
+                    value={meeting.email}
+                    onChange={(e) =>
+                      handleInputChange(meeting.id, 'email', e.target.value)
+                    }
+                    placeholder="Enter organiser email"
+                    required
+                    className={`w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none ${
+                      meeting.email && !validateEmail(meeting.email) ? 'border-red-500' : ''
+                    }`}
+                  />
+                  {meeting.email && !validateEmail(meeting.email) && (
+                    <p className="text-red-500 text-sm mt-1">Please enter a valid email address</p>
+                  )}
+                </div>
 
-              <div>
-                <label className="flex items-center gap-2 text-gray-700 mb-2">
-                  <Calendar size={18} />
-                  Meeting Start Time *
-                </label>
-                <input
-                  type="datetime-local"
-                  value={meeting.startTime}
-                  onChange={(e) =>
-                    handleInputChange(meeting.id, 'startTime', e.target.value)
-                  }
-                  required
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
-                />
-              </div>
+                <div>
+                  <label className="flex items-center gap-2 text-gray-700 mb-2">
+                    <Users size={18} />
+                    Attendees *
+                  </label>
+                  <input
+                    type="text"
+                    value={meeting.attendees}
+                    onChange={(e) =>
+                      handleInputChange(meeting.id, 'attendees', e.target.value)
+                    }
+                    placeholder="Enter attendees"
+                    required
+                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-gray-700 mb-2">
-                  <Clock size={18} />
-                  Meeting Duration *
-                </label>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <input
-                      type="number"
-                      min="0"
-                      value={meeting.durationHours}
-                      onChange={(e) =>
-                        handleInputChange(meeting.id, 'durationHours', e.target.value)
-                      }
-                      placeholder="Hours"
-                      required
-                      className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <input
-                      type="number"
-                      min="0"
-                      max="59"
-                      value={meeting.durationMinutes}
-                      onChange={(e) =>
-                        handleInputChange(meeting.id, 'durationMinutes', e.target.value)
-                      }
-                      placeholder="Minutes"
-                      required
-                      className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <input
-                      type="number"
-                      min="0"
-                      max="59"
-                      value={meeting.durationSeconds}
-                      onChange={(e) =>
-                        handleInputChange(meeting.id, 'durationSeconds', e.target.value)
-                      }
-                      placeholder="Seconds"
-                      required
-                      className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
-                    />
-                  </div>
+                <div>
+                  <label className="flex items-center gap-2 text-gray-700 mb-2">
+                    <Calendar size={18} />
+                    Meeting Start Time *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={meeting.startTime}
+                    onChange={(e) =>
+                      handleInputChange(meeting.id, 'startTime', e.target.value)
+                    }
+                    required
+                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 text-gray-700 mb-2">
+                    <Upload size={18} />
+                    Recording File (MP4, MP3) *
+                  </label>
+                  <input
+                    type="file"
+                    accept=".mp4,.mp3,video/mp4,audio/mp3"
+                    onChange={(e) =>
+                      handleFileChange(meeting.id, e.target.files?.[0] || null)
+                    }
+                    required
+                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                  />
                 </div>
               </div>
+            </div>
 
-              <div>
-                <label className="flex items-center gap-2 text-gray-700 mb-2">
-                  <Upload size={18} />
-                  Recording File (MP4, MP3) *
-                </label>
-                <input
-                  type="file"
-                  accept=".mp4,.mp3,video/mp4,audio/mp3"
-                  onChange={(e) =>
-                    handleFileChange(meeting.id, e.target.files?.[0] || null)
-                  }
-                  required
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
-                />
+            {/* Deal Information Card */}
+            <div className="bg-white p-8 rounded-lg shadow-sm">
+              <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+                <FileText size={24} />
+                Deal Information (Optional)
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="flex items-center gap-2 text-gray-700 mb-2">
+                    <FileText size={18} />
+                    Deal Name
+                  </label>
+                  <input
+                    type="text"
+                    value={meeting.dealName}
+                    onChange={(e) =>
+                      handleInputChange(meeting.id, 'dealName', e.target.value)
+                    }
+                    placeholder="Enter deal name"
+                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 text-gray-700 mb-2">
+                    <FileText size={18} />
+                    Stage Name during the call
+                  </label>
+                  <input
+                    type="text"
+                    value={meeting.dealStageDuringCall}
+                    onChange={(e) =>
+                      handleInputChange(meeting.id, 'dealStageDuringCall', e.target.value)
+                    }
+                    placeholder="Enter deal stage during call"
+                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 text-gray-700 mb-2">
+                    <FileText size={18} />
+                    Current Deal Stage
+                  </label>
+                  <input
+                    type="text"
+                    value={meeting.currentDealStage}
+                    onChange={(e) =>
+                      handleInputChange(meeting.id, 'currentDealStage', e.target.value)
+                    }
+                    placeholder="Enter current deal stage"
+                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                  />
+                </div>
               </div>
             </div>
           </div>
         ))}
 
-        <div className="flex justify-between items-center">
-          <button
-            onClick={addMeeting}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-          >
-            <Plus size={20} />
-            Add Another Meeting
-          </button>
-
+        <div className="mt-6 flex justify-end">
           <button
             onClick={handleUpload}
             disabled={isUploading || !meetings.every(isFormValid)}
@@ -497,7 +491,7 @@ export function MeetingUploader() {
             ) : (
               <>
                 <Upload size={20} />
-                Upload All Meetings
+                Upload Meeting
               </>
             )}
           </button>
