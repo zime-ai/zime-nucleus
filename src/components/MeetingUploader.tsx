@@ -102,6 +102,9 @@ export function MeetingUploader() {
     if (!meeting.attendees.trim()) return 'Attendees are required';
     if (!meeting.startTime) return 'Start time is required';
     if (!meeting.recording) return 'Recording file is required';
+    if (!meeting.dealName?.trim()) return 'Deal name is required';
+    if (!meeting.dealStageDuringCall?.trim()) return 'Stage name during the call is required';
+    if (!meeting.currentDealStage?.trim()) return 'Current deal stage is required';
     return null;
   };
 
@@ -280,7 +283,10 @@ export function MeetingUploader() {
       validateEmail(meeting.email.trim()) &&
       meeting.attendees.trim() &&
       meeting.startTime &&
-      meeting.recording
+      meeting.recording &&
+      meeting.dealName?.trim() &&
+      meeting.dealStageDuringCall?.trim() &&
+      meeting.currentDealStage?.trim()
     );
   };
 
@@ -448,22 +454,23 @@ export function MeetingUploader() {
             <div className="bg-white p-8 rounded-lg shadow-sm">
               <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
                 <FileText size={24} />
-                Deal Information (Optional)
+                Deal Information
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="flex items-center gap-2 text-gray-700 mb-2">
                     <FileText size={18} />
-                    Deal Name
+                    Deal Name *
                   </label>
                   <input
                     type="text"
-                    value={meeting.dealName}
+                    value={meeting.dealName || ''}
                     onChange={(e) =>
                       handleInputChange(meeting.id, 'dealName', e.target.value)
                     }
                     placeholder="Enter deal name"
+                    required
                     className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
                   />
                 </div>
@@ -471,15 +478,16 @@ export function MeetingUploader() {
                 <div>
                   <label className="flex items-center gap-2 text-gray-700 mb-2">
                     <FileText size={18} />
-                    Stage Name during the call
+                    Stage Name during the call *
                   </label>
                   <input
                     type="text"
-                    value={meeting.dealStageDuringCall}
+                    value={meeting.dealStageDuringCall || ''}
                     onChange={(e) =>
                       handleInputChange(meeting.id, 'dealStageDuringCall', e.target.value)
                     }
                     placeholder="Enter deal stage during call"
+                    required
                     className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
                   />
                 </div>
@@ -487,15 +495,16 @@ export function MeetingUploader() {
                 <div>
                   <label className="flex items-center gap-2 text-gray-700 mb-2">
                     <FileText size={18} />
-                    Current Deal Stage
+                    Current Deal Stage *
                   </label>
                   <input
                     type="text"
-                    value={meeting.currentDealStage}
+                    value={meeting.currentDealStage || ''}
                     onChange={(e) =>
                       handleInputChange(meeting.id, 'currentDealStage', e.target.value)
                     }
                     placeholder="Enter current deal stage"
+                    required
                     className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
                   />
                 </div>
