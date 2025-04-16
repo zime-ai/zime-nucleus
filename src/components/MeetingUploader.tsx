@@ -117,6 +117,22 @@ export function MeetingUploader() {
     }
   };
 
+  const formatDateTime = (dateTimeStr: string): string => {
+    const date = new Date(dateTimeStr);
+    // Subtract 5 hours and 30 minutes to compensate for API offset
+    date.setHours(date.getHours() - 5);
+    date.setMinutes(date.getMinutes() - 30);
+    
+    // Format as YYYY-MM-DDThh:mm
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   const uploadMeeting = async (meeting: Meeting) => {
     const validationError = validateMeeting(meeting);
     if (validationError) {
@@ -132,10 +148,10 @@ export function MeetingUploader() {
     }
 
     const formData = new FormData();
-    formData.append('title', meeting.title);
-    formData.append('email', meeting.email);
-    formData.append('attendees', meeting.attendees);
-    formData.append('meeting_start_time', meeting.startTime);
+    formData.append('title', meeting.title.trim());
+    formData.append('email', meeting.email.trim());
+    formData.append('attendees', meeting.attendees.trim());
+    formData.append('meeting_start_time', formatDateTime(meeting.startTime));
     if (meeting.recording) {
       formData.append('file', meeting.recording);
     }
@@ -177,42 +193,57 @@ export function MeetingUploader() {
 
         xhr.addEventListener('load', () => {
           if (xhr.status >= 200 && xhr.status < 300) {
-            const response = JSON.parse(xhr.responseText);
-            if (response.error) {
-              const errorMessage = `${response.error.message}\n${response.error.details}`;
+            try {
+              const response = JSON.parse(xhr.responseText);
+              if (response.status === 'error') {
+                const errorMessage = response.error?.message || 'Upload failed';
+                setUploadStatuses(prev => prev.map(status => 
+                  status.meetingId === meeting.id 
+                    ? { ...status, status: 'error', error: errorMessage } 
+                    : status
+                ));
+                reject(new Error(errorMessage));
+              } else {
+                setUploadStatuses(prev => prev.map(status => 
+                  status.meetingId === meeting.id 
+                    ? { ...status, status: 'success', callId: response.data?.callId } 
+                    : status
+                ));
+                resolve(response);
+              }
+            } catch (parseError) {
+              setUploadStatuses(prev => prev.map(status => 
+                status.meetingId === meeting.id 
+                  ? { ...status, status: 'error', error: 'Failed to parse server response' } 
+                  : status
+              ));
+              reject(new Error('Failed to parse server response'));
+            }
+          } else {
+            try {
+              const error = JSON.parse(xhr.responseText);
+              const errorMessage = error.error?.message || 'Upload failed';
               setUploadStatuses(prev => prev.map(status => 
                 status.meetingId === meeting.id 
                   ? { ...status, status: 'error', error: errorMessage } 
                   : status
               ));
               reject(new Error(errorMessage));
-            } else {
+            } catch (parseError) {
               setUploadStatuses(prev => prev.map(status => 
                 status.meetingId === meeting.id 
-                  ? { ...status, status: 'success', callId: response.data?.callId } 
+                  ? { ...status, status: 'error', error: 'Upload failed' } 
                   : status
               ));
-              resolve(response);
+              reject(new Error('Upload failed'));
             }
-          } else {
-            const error = JSON.parse(xhr.responseText);
-            let errorMessage = 'Upload failed';
-            if (error.error && error.error.message && error.error.details) {
-              errorMessage = `${error.error.message}\n${error.error.details}`;
-            }
-            setUploadStatuses(prev => prev.map(status => 
-              status.meetingId === meeting.id 
-                ? { ...status, status: 'error', error: errorMessage } 
-                : status
-            ));
-            reject(new Error(errorMessage));
           }
         });
 
         xhr.addEventListener('error', () => {
           setUploadStatuses(prev => prev.map(status => 
             status.meetingId === meeting.id 
-              ? { ...status, status: 'error', error: 'Network error occurred' } 
+              ? { ...status, status: 'error', error: 'Network error occurred. Please check your internet connection.' } 
               : status
           ));
           reject(new Error('Network error occurred'));
