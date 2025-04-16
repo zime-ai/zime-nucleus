@@ -7,7 +7,9 @@ interface Meeting {
   email: string;
   attendees: string;
   startTime: string;
-  duration: string;
+  durationHours: string;
+  durationMinutes: string;
+  durationSeconds: string;
   recording: File | null;
 }
 
@@ -28,7 +30,9 @@ export function MeetingUploader() {
       email: '',
       attendees: '',
       startTime: '',
-      duration: '',
+      durationHours: '',
+      durationMinutes: '',
+      durationSeconds: '',
       recording: null,
     },
   ]);
@@ -44,7 +48,9 @@ export function MeetingUploader() {
         email: '',
         attendees: '',
         startTime: '',
-        duration: '',
+        durationHours: '',
+        durationMinutes: '',
+        durationSeconds: '',
         recording: null,
       },
     ]);
@@ -68,13 +74,13 @@ export function MeetingUploader() {
   };
 
   const handleFileChange = (id: number, file: File | null) => {
-    if (file && !file.name.toLowerCase().endsWith('.mp4')) {
+    if (file && !file.name.toLowerCase().endsWith('.mp4') && !file.name.toLowerCase().endsWith('.mp3')) {
       setUploadStatuses(prev => [
         ...prev.filter(status => status.meetingId !== id),
         {
           meetingId: id,
           status: 'error',
-          error: 'Only MP4 files are allowed'
+          error: 'Only MP4 and MP3 files are allowed'
         }
       ]);
       return;
@@ -89,7 +95,28 @@ export function MeetingUploader() {
     if (!meeting.email.trim()) return 'Email is required';
     if (!meeting.attendees.trim()) return 'Attendees are required';
     if (!meeting.startTime) return 'Start time is required';
-    if (!meeting.duration) return 'Duration is required';
+    
+    // Duration validation
+    const hours = parseInt(meeting.durationHours || '0');
+    const minutes = parseInt(meeting.durationMinutes || '0');
+    const seconds = parseInt(meeting.durationSeconds || '0');
+
+    if (isNaN(hours) || isNaN(minutes) || isNaN(seconds)) {
+      return 'Duration must be a valid number';
+    }
+
+    if (hours === 0 && minutes === 0 && seconds === 0) {
+      return 'Duration must be greater than 0';
+    }
+
+    if (minutes >= 60 || seconds >= 60) {
+      return 'Minutes and seconds must be less than 60';
+    }
+
+    if (hours < 0 || minutes < 0 || seconds < 0) {
+      return 'Duration cannot be negative';
+    }
+
     if (!meeting.recording) return 'Recording file is required';
     return null;
   };
@@ -120,12 +147,18 @@ export function MeetingUploader() {
       return;
     }
 
+    const hours = parseInt(meeting.durationHours || '0');
+    const minutes = parseInt(meeting.durationMinutes || '0');
+    const seconds = parseInt(meeting.durationSeconds || '0');
+
+    const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+
     const formData = new FormData();
     formData.append('title', meeting.title);
     formData.append('email', meeting.email);
     formData.append('attendees', meeting.attendees);
     formData.append('meeting_start_time', meeting.startTime);
-    formData.append('video_duration', meeting.duration);
+    formData.append('video_duration', totalSeconds.toString());
     if (meeting.recording) {
       formData.append('file', meeting.recording);
     }
@@ -219,12 +252,24 @@ export function MeetingUploader() {
   };
 
   const isFormValid = (meeting: Meeting): boolean => {
+    const hours = parseInt(meeting.durationHours || '0');
+    const minutes = parseInt(meeting.durationMinutes || '0');
+    const seconds = parseInt(meeting.durationSeconds || '0');
+
     return Boolean(
       meeting.title.trim() &&
       meeting.email.trim() &&
       meeting.attendees.trim() &&
       meeting.startTime &&
-      meeting.duration &&
+      !isNaN(hours) &&
+      !isNaN(minutes) &&
+      !isNaN(seconds) &&
+      (hours > 0 || minutes > 0 || seconds > 0) &&
+      minutes < 60 &&
+      seconds < 60 &&
+      hours >= 0 &&
+      minutes >= 0 &&
+      seconds >= 0 &&
       meeting.recording
     );
   };
@@ -357,31 +402,64 @@ export function MeetingUploader() {
                 />
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <label className="flex items-center gap-2 text-gray-700 mb-2">
                   <Clock size={18} />
-                  Meeting Duration (seconds) *
+                  Meeting Duration *
                 </label>
-                <input
-                  type="number"
-                  value={meeting.duration}
-                  onChange={(e) =>
-                    handleInputChange(meeting.id, 'duration', e.target.value)
-                  }
-                  placeholder="550"
-                  required
-                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
-                />
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      min="0"
+                      value={meeting.durationHours}
+                      onChange={(e) =>
+                        handleInputChange(meeting.id, 'durationHours', e.target.value)
+                      }
+                      placeholder="Hours"
+                      required
+                      className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={meeting.durationMinutes}
+                      onChange={(e) =>
+                        handleInputChange(meeting.id, 'durationMinutes', e.target.value)
+                      }
+                      placeholder="Minutes"
+                      required
+                      className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={meeting.durationSeconds}
+                      onChange={(e) =>
+                        handleInputChange(meeting.id, 'durationSeconds', e.target.value)
+                      }
+                      placeholder="Seconds"
+                      required
+                      className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div>
                 <label className="flex items-center gap-2 text-gray-700 mb-2">
                   <Upload size={18} />
-                  Recording File (MP4) *
+                  Recording File (MP4, MP3) *
                 </label>
                 <input
                   type="file"
-                  accept=".mp4,video/mp4"
+                  accept=".mp4,.mp3,video/mp4,audio/mp3"
                   onChange={(e) =>
                     handleFileChange(meeting.id, e.target.files?.[0] || null)
                   }
