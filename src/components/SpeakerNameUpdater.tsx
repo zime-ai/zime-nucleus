@@ -1,48 +1,28 @@
-import { useState, useEffect } from 'react';
-import { Hash, Users, User, RefreshCw, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Hash, Users, Loader2, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
 
-interface SpeakerInput {
-  id: number;
+interface Speaker {
   currentName: string;
   newName: string;
-}
-
-interface StatusMessage {
-  type: 'success' | 'error';
-  text: string;
 }
 
 export function SpeakerNameUpdater() {
   const [callId, setCallId] = useState('');
   const [numSpeakers, setNumSpeakers] = useState('');
-  const [speakers, setSpeakers] = useState<SpeakerInput[]>([]);
+  const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [status, setStatus] = useState<StatusMessage | null>(null);
-  const [numSpeakersError, setNumSpeakersError] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  useEffect(() => {
-    const num = parseInt(numSpeakers) || 0;
-    if (num > 15) {
-      setNumSpeakersError('Enter a number less than 15');
-      return;
-    }
-    setNumSpeakersError(null);
-    setSpeakers(prevSpeakers => {
-      const newSpeakers = Array(num).fill(null).map((_, index) => ({
-        id: index + 1,
-        currentName: prevSpeakers[index]?.currentName || '',
-        newName: prevSpeakers[index]?.newName || ''
-      }));
-      return newSpeakers;
-    });
-  }, [numSpeakers]);
+  const handleNumSpeakersChange = (value: string) => {
+    const num = parseInt(value) || 0;
+    setNumSpeakers(value);
+    setSpeakers(Array(num).fill(null).map(() => ({ currentName: '', newName: '' })));
+  };
 
-  const handleSpeakerNameChange = (id: number, field: 'currentName' | 'newName', value: string) => {
-    setSpeakers(prevSpeakers =>
-      prevSpeakers.map(speaker =>
-        speaker.id === id ? { ...speaker, [field]: value } : speaker
-      )
-    );
+  const handleSpeakerChange = (index: number, field: keyof Speaker, value: string) => {
+    setSpeakers(prev => prev.map((speaker, i) => 
+      i === index ? { ...speaker, [field]: value } : speaker
+    ));
   };
 
   const handleUpdate = async () => {
@@ -52,6 +32,7 @@ export function SpeakerNameUpdater() {
     setStatus(null);
     
     try {
+      // Format the update_speakers object as per API requirement
       const update_speakers: { [key: string]: string } = {};
       speakers.forEach(speaker => {
         if (speaker.currentName.trim() && speaker.newName.trim()) {
@@ -72,67 +53,58 @@ export function SpeakerNameUpdater() {
 
       const data = await response.json();
 
-      if (data.data?.error_message) {
+      if (data.error_message) {
         setStatus({
           type: 'error',
-          text: `${data.data.error_message}. Please check the current speaker name.`
+          message: `${data.error_message}. Check current speaker name`
         });
         return;
       }
 
-      if (response.ok && data.statusCode === 201) {
-        setStatus({
-          type: 'success',
-          text: data.data.message || 'Updated successfully.'
-        });
-      } else {
+      if (!response.ok) {
         setStatus({
           type: 'error',
-          text: 'Failed to update speaker names. Please check the current speaker name.'
+          message: 'Failed to update speaker names. Check the Call ID'
         });
+        return;
       }
+
+      setStatus({
+        type: 'success',
+        message: data.message || 'Updated successfully.'
+      });
     } catch (error) {
       setStatus({
         type: 'error',
-        text: error instanceof Error 
-          ? `${error.message}. Please check the current speaker name.`
-          : 'Failed to update speaker names. Please check the current speaker name.'
+        message: 'Failed to connect to server. Check the Call ID'
       });
     } finally {
       setIsUpdating(false);
     }
   };
 
-  const isFormValid = () => {
-    return (
-      callId.trim() &&
-      numSpeakers &&
-      parseInt(numSpeakers) > 0 &&
-      speakers.length > 0 &&
-      speakers.every(s => s.currentName.trim() && s.newName.trim())
-    );
-  };
-
   return (
     <div className="p-8">
       <div className="max-w-6xl mx-auto">
         <div className="bg-white p-8 rounded-lg shadow-sm">
-          <div className="space-y-6">
-            {status && (
-              <div className={`p-4 rounded-lg flex items-center gap-2 ${
-                status.type === 'success' 
-                  ? 'bg-green-50 text-green-700' 
-                  : 'bg-red-50 text-red-700'
-              }`}>
+          {status && (
+            <div className={`mb-6 p-4 rounded-lg ${
+              status.type === 'success' ? 'bg-green-50' : 'bg-red-50'
+            }`}>
+              <div className="flex items-center gap-2">
                 {status.type === 'success' ? (
                   <CheckCircle size={20} className="text-green-500" />
                 ) : (
                   <XCircle size={20} className="text-red-500" />
                 )}
-                <span>{status.text}</span>
+                <span className={status.type === 'success' ? 'text-green-700' : 'text-red-700'}>
+                  {status.message}
+                </span>
               </div>
-            )}
+            </div>
+          )}
 
+          <div className="space-y-6">
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-gray-700 mb-2">
                 <Hash size={18} />
@@ -156,66 +128,56 @@ export function SpeakerNameUpdater() {
               <input
                 type="number"
                 min="1"
-                max="15"
                 value={numSpeakers}
-                onChange={(e) => setNumSpeakers(e.target.value)}
+                onChange={(e) => handleNumSpeakersChange(e.target.value)}
                 placeholder="Enter number of speakers"
                 required
-                className={`w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none ${
-                  numSpeakersError ? 'border-red-500' : ''
-                }`}
+                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
               />
-              {numSpeakersError && (
-                <p className="text-red-500 text-sm mt-1">{numSpeakersError}</p>
-              )}
             </div>
 
-            {speakers.length > 0 && (
-              <div className="space-y-6">
-                {speakers.map((speaker) => (
-                  <div key={speaker.id} className="p-4 border rounded-lg space-y-4">
-                    <h3 className="flex items-center gap-2 text-gray-700 font-medium">
-                      <User size={18} />
-                      Speaker {speaker.id}
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="block text-sm text-gray-700">
-                          Current Name (as on call link) *
-                        </label>
-                        <input
-                          type="text"
-                          value={speaker.currentName}
-                          onChange={(e) => handleSpeakerNameChange(speaker.id, 'currentName', e.target.value)}
-                          placeholder="Enter current speaker name"
-                          required
-                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="block text-sm text-gray-700">
-                          New Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={speaker.newName}
-                          onChange={(e) => handleSpeakerNameChange(speaker.id, 'newName', e.target.value)}
-                          placeholder="Enter new speaker name"
-                          required
-                          className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
-                        />
-                      </div>
-                    </div>
+            {speakers.map((speaker, index) => (
+              <div key={index} className="bg-gray-50 p-6 rounded-lg">
+                <h3 className="flex items-center gap-2 text-gray-700 mb-4">
+                  <Users size={18} />
+                  Speaker {index + 1}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-700 mb-2">
+                      Current Name (as on call link) *
+                    </label>
+                    <input
+                      type="text"
+                      value={speaker.currentName}
+                      onChange={(e) => handleSpeakerChange(index, 'currentName', e.target.value)}
+                      placeholder="Enter current speaker name"
+                      required
+                      className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                    />
                   </div>
-                ))}
+                  <div>
+                    <label className="block text-gray-700 mb-2">
+                      New Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={speaker.newName}
+                      onChange={(e) => handleSpeakerChange(index, 'newName', e.target.value)}
+                      placeholder="Enter new speaker name"
+                      required
+                      className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-orange-200 focus:border-orange-400 outline-none"
+                    />
+                  </div>
+                </div>
               </div>
-            )}
+            ))}
 
             <button
               onClick={handleUpdate}
-              disabled={isUpdating || !isFormValid()}
+              disabled={isUpdating || !callId.trim() || speakers.length === 0 || !speakers.every(s => s.currentName.trim() && s.newName.trim())}
               className={`flex items-center gap-2 px-6 py-2 bg-orange-500 text-white rounded-lg transition-colors ${
-                isUpdating || !isFormValid()
+                isUpdating || !callId.trim() || speakers.length === 0 || !speakers.every(s => s.currentName.trim() && s.newName.trim())
                   ? 'opacity-50 cursor-not-allowed'
                   : 'hover:bg-orange-600'
               }`}
