@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { MeetingUploader } from './components/MeetingUploader';
 import { TranscriptUpdater } from './components/TranscriptUpdater';
 import { SpeakerNameUpdater } from './components/SpeakerNameUpdater';
-import { Upload, FileText, Users } from 'lucide-react';
+import { DurationUpdater } from './components/DurationUpdater';
+import { Upload, FileText, Users, Clock } from 'lucide-react';
 import logo from './assets/zime-logo.png';
 
-type Section = 'meeting' | 'transcript' | 'speaker';
+type Section = 'meeting' | 'transcript' | 'speaker' | 'duration';
 
 function App() {
   const [currentSection, setCurrentSection] = useState<Section>('meeting');
@@ -60,6 +61,17 @@ function App() {
               <Users size={20} />
               Update Speaker
             </button>
+            <button
+              onClick={() => setCurrentSection('duration')}
+              className={`w-full flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                currentSection === 'duration'
+                  ? 'bg-orange-100 text-orange-600'
+                  : 'hover:bg-gray-100'
+              }`}
+            >
+              <Clock size={20} />
+              Update Duration
+            </button>
           </div>
         </nav>
       </div>
@@ -69,6 +81,7 @@ function App() {
         {currentSection === 'meeting' && <MeetingUploader />}
         {currentSection === 'transcript' && <TranscriptUpdater />}
         {currentSection === 'speaker' && <SpeakerNameUpdater />}
+        {currentSection === 'duration' && <DurationUpdater />}
       </div>
     </div>
   );
