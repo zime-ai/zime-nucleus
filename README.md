@@ -1,5 +1,7 @@
 # Zime Video Uploader
 
+> This project can be accessed at https://nucleus.zime.dev
+
 A React TypeScript application for uploading and processing meeting recordings to Zime.ai.
 
 ## Features
@@ -45,3 +47,4 @@ No environment variables are required as the API endpoint is configured in the c
 - Vite
 - Tailwind CSS
 - Lucide React Icons 
+
