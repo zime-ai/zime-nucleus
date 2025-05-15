@@ -2,6 +2,8 @@
 
 > This project can be accessed at https://nucleus.zime.dev
 
+It gets auto-deployed.
+
 A React TypeScript application for uploading and processing meeting recordings to Zime.ai.
 
 ## Features
