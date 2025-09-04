@@ -50,3 +50,4 @@ No environment variables are required as the API endpoint is configured in the c
 - Tailwind CSS
 - Lucide React Icons 
 
+
