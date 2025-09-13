@@ -1,6 +1,7 @@
 # Zime Video Uploader
 
 > This project can be accessed at https://nucleus.zime.dev
+> Dev domain can be accessed at https://nucleus-dev.zime.ai
 
 It gets auto-deployed.
 
