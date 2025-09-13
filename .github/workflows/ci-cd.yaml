@@ -1,0 +1,167 @@
+name: Build, Push, and Deploy Next.js Dashboard App
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Override stage (dev). If set, runs a single ad-hoc deploy.
+        required: false
+        type: choice
+        options: ["dev"]
+      apply:
+        description: Apply deployment changes (true to apply, false to skip deployment)
+        required: true
+        default: "true"
+        type: choice
+        options: ["false", "true"]
+
+env:
+  AWS_ROLE_ARN: arn:aws:iam::949847155722:role/github-actions-role
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - stage: dev
+            region: us-east-1
+            when: branch
+            ref: refs/heads/dev
+            ci_secret_id: nucleus-service-dev
+
+    steps:
+      - name: Check if this stage should run
+        id: should_run
+        run: |
+          SHOULD_RUN=false
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            case "${{ matrix.stage }}" in
+              "dev")
+                if [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+                  SHOULD_RUN=true
+                fi
+                ;;
+            esac
+          fi
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ inputs.stage }}" == "${{ matrix.stage }}" ]]; then
+              SHOULD_RUN=true
+            fi
+          fi
+          echo "should_run=$SHOULD_RUN" >> $GITHUB_OUTPUT
+          echo "Stage ${{ matrix.stage }}: should_run=$SHOULD_RUN"
+
+      - name: Checkout
+        if: steps.should_run.outputs.should_run == 'true'
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        if: steps.should_run.outputs.should_run == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ matrix.region }}
+
+      - name: Export CI config from Secrets Manager
+        if: steps.should_run.outputs.should_run == 'true'
+        run: |
+          set -euo pipefail
+          JSON=$(aws secretsmanager get-secret-value --secret-id "${{ matrix.ci_secret_id }}" --query SecretString --output text)
+
+          # Extract only CI/CD related configuration (not application env vars)
+          echo "AWS_ACCOUNT_ID=$(echo "$JSON" | jq -r '.AWS_ACCOUNT_ID // "949847155722"')" >> $GITHUB_ENV
+          echo "ECR_REPOSITORY_NAME=$(echo "$JSON" | jq -r '.ECR_REPOSITORY_NAME // "nucleus-service"')" >> $GITHUB_ENV
+          echo "DESTINATION_REPOSITORY=$(echo "$JSON" | jq -r '.DESTINATION_REPOSITORY // "zime-ai/zime-deploy"')" >> $GITHUB_ENV
+          echo "DESTINATION_BRANCH=$(echo "$JSON" | jq -r '.DESTINATION_BRANCH // "main"')" >> $GITHUB_ENV
+          echo "DESTINATION_FILE_TO_UPDATE=$(echo "$JSON" | jq -r '.DESTINATION_FILE_TO_UPDATE // "applications/nucleus-service/values_dev.yaml"')" >> $GITHUB_ENV
+          echo "GITHUB_PAT=$(echo "$JSON" | jq -r '.GITHUB_PAT // .GITHUB_ACCESS_TOKEN')" >> $GITHUB_ENV
+
+          echo "✅ CI/CD configuration and build args extracted from secrets"
+
+      - name: Set IMAGE_TAG env
+        if: steps.should_run.outputs.should_run == 'true'
+        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Login to Amazon ECR
+        if: steps.should_run.outputs.should_run == 'true'
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push API MONITOR APP (single arch)
+        if: steps.should_run.outputs.should_run == 'true'
+        run: |
+          echo "🏗️ Building Docker image for linux/amd64..."
+
+          # Build the Docker image with ALL build args from secrets
+          docker build \
+            --tag ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ matrix.region }}.amazonaws.com/${{ env.ECR_REPOSITORY_NAME }}:${{ env.IMAGE_TAG }} \
+            --file Dockerfile \
+            .
+          echo "📤 Pushing Docker image to ECR..."
+          docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ matrix.region }}.amazonaws.com/${{ env.ECR_REPOSITORY_NAME }}:${{ env.IMAGE_TAG }}
+
+          echo "✅ Docker image built and pushed successfully"
+
+      - name: Checkout CD repository (with GitHub PAT)
+        if: steps.should_run.outputs.should_run == 'true' && inputs.apply != 'false'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DESTINATION_REPOSITORY }}
+          ref: ${{ env.DESTINATION_BRANCH }}
+          token: ${{ env.GITHUB_PAT }}
+          path: cd-repo
+
+      - name: Update external CD repository with new image tags
+        if: steps.should_run.outputs.should_run == 'true'
+        run: |
+          echo "Updating CD repository with new image tags..."
+          SOURCE_COMMIT_URL="https://github.com/${{ github.repository }}/commit/${GITHUB_SHA}"
+          COMMIT_MESSAGE="github-actions-ci: update api monitor app image tag to ${{ env.IMAGE_TAG }} for ${{ matrix.stage }} built from $SOURCE_COMMIT_URL"
+          WORKDIR="cd-repo"
+
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+          # Update the deployment file with new image tag (only the tag, not the whole config)
+          IMAGE_URI="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ matrix.region }}.amazonaws.com/${{ env.ECR_REPOSITORY_NAME }}"
+
+          # Simple sed command to update only the image tag
+          sed -i "s|tag: \".*\"|tag: \"${{ env.IMAGE_TAG }}\"|g" \
+            "$WORKDIR/${{ env.DESTINATION_FILE_TO_UPDATE }}"
+
+          # Commit and push the changes
+          cd "$WORKDIR"
+          git add .
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "$COMMIT_MESSAGE"
+            git push origin "${{ env.DESTINATION_BRANCH }}"
+            echo "CD repository updated successfully."
+          else
+            echo "No changes to commit."
+          fi
+
+      - name: Deployment summary
+        if: steps.should_run.outputs.should_run == 'true'
+        run: |
+          echo "🚀 Deployment Summary:"
+          echo "Stage: ${{ matrix.stage }}"
+          echo "Region: ${{ matrix.region }}"
+          echo "Commit: ${GITHUB_SHA::7}"
+          echo "API MONITOR APP IMAGE: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ matrix.region }}.amazonaws.com/${{ env.ECR_REPOSITORY_NAME }}:${{ env.IMAGE_TAG }}"
+          echo "🏗️  Architecture: linux/amd64 (single arch for faster dev builds)"
+          echo "📦 Cache Strategy: GitHub Actions + Registry cache"
+          echo "🔐 Secrets: Injected at build time via AWS Secrets Manager"
+          echo "📂 Deployment Repo: ${{ env.DESTINATION_REPOSITORY }}"
+          echo "📁 Values File: ${{ env.DESTINATION_FILE_TO_UPDATE }}"
+          echo "⚡ Performance: Optimized caching for faster subsequent builds"
+          echo "✅ Docker image pushed successfully to ECR"
+          if [[ "${{ inputs.apply }}" != "false" ]]; then
+            echo "✅ CD repository updated with new image tag"
+          fi
