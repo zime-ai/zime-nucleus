@@ -3,13 +3,14 @@ on:
   push:
     branches:
       - dev
+      - TASK-20250921-setting-up-prod-ci
   workflow_dispatch:
     inputs:
       stage:
         description: Override stage (dev). If set, runs a single ad-hoc deploy.
         required: false
         type: choice
-        options: ["dev"]
+        options: ["dev", "main"]
       apply:
         description: Apply deployment changes (true to apply, false to skip deployment)
         required: true
@@ -36,6 +37,11 @@ jobs:
             when: branch
             ref: refs/heads/dev
             ci_secret_id: nucleus-service-dev
+          - stage: main
+            region: us-east-1
+            when: branch
+            ref: refs/heads/TASK-20250921-setting-up-prod-ci
+            ci_secret_id: nucleus-service-prod
 
     steps:
       - name: Check if this stage should run
@@ -46,6 +52,11 @@ jobs:
             case "${{ matrix.stage }}" in
               "dev")
                 if [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+                  SHOULD_RUN=true
+                fi
+                ;;
+              "main")
+                if [[ "${{ github.ref }}" == "refs/heads/TASK-20250921-setting-up-prod-ci" ]]; then
                   SHOULD_RUN=true
                 fi
                 ;;
